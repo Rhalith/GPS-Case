@@ -1,4 +1,5 @@
 using System.Collections;
+using Navigation;
 using UnityEngine;
 
 namespace Location
@@ -6,21 +7,29 @@ namespace Location
     /// <summary>Maps GPS changes to world-space meters and teleports the player every interval.</summary>
     public sealed class GpsController : MonoBehaviour
     {
-        [Header("Scene References")]
-        [SerializeField] private Transform player;      // assign spawned player root
-        [SerializeField] private Transform startPoint;  // same StartPoint used by GameManager
+        [Header("Scene References")] [SerializeField]
+        private Transform player; // assign spawned player root
 
-        [Header("UI (optional)")]
-        [SerializeField] private UI.GpsHud hud; 
-        
-        [Header("Provider")]
+        [SerializeField] private Transform startPoint; // same StartPoint used by GameManager
+
+        [Header("UI (optional)")] 
+        [SerializeField] private UI.GpsHud hud;
+
+        [Header("Provider")] 
         [SerializeField] private ProviderType provider = ProviderType.EditorFake;
 
-        [Header("Options")]
-        [Tooltip("Seconds between polls.")]
+        [Header("Options")] 
+        [Tooltip("Seconds between polls.")] 
         [SerializeField, Min(1f)] private float pollSeconds = 3f;
-        [Tooltip("Swap X/Z axes if your model's forward is different.")]
+
+        [Tooltip("Swap X/Z axes if your model's forward is different.")] 
         [SerializeField] private bool swapXZ;
+
+        [Header("Snapping (optional)")]
+        [Tooltip("Assign any component that implements IPositionSnapper (e.g., NavMeshSnapper or MeshSnapper or PathSnapper).")]
+        [SerializeField] private MonoBehaviour snapperBehaviour;
+
+        private IPositionSnapper _snapper;   // resolved at runtime
 
         private IGpsProvider _gps;
         private bool _running;
@@ -28,12 +37,22 @@ namespace Location
         private LocationData _origin;
 
         // can be private
-        private enum ProviderType { UnityLocationService, EditorFake }
+        private enum ProviderType
+        {
+            UnityLocationService,
+            EditorFake
+        }
 
         private void Awake()
         {
-            if (!player)     Debug.LogWarning("[GpsController] Player not assigned.");
+            if (!player) Debug.LogWarning("[GpsController] Player not assigned.");
             if (!startPoint) Debug.LogWarning("[GpsController] StartPoint not assigned.");
+            if (snapperBehaviour)
+            {
+                _snapper = snapperBehaviour as IPositionSnapper;
+                if (_snapper == null)
+                    Debug.LogError("[GpsController] Snapper does not implement IPositionSnapper.");
+            }
         }
 
         private void OnEnable()
@@ -47,7 +66,7 @@ namespace Location
                 ? new UnityLocationGpsProvider()
                 : new EditorFakeGpsProvider();
 #endif
-            hud?.SetStatus("Initializing…"); 
+            hud?.SetStatus("Initializing…");
             StartCoroutine(RunRoutine());
         }
 
@@ -56,14 +75,14 @@ namespace Location
             _gps?.Shutdown();
             _running = false;
             _hasOrigin = false;
-            hud?.SetStatus("Stopped");  
+            hud?.SetStatus("Stopped");
         }
 
         private IEnumerator RunRoutine()
         {
             // initialize provider
             yield return StartCoroutine(_gps.Initialize());
-            
+
             // If provider couldn't start, keep HUD honest and bail out.
             LocationData tmp;
             if (!_gps.TryGetLatest(out tmp))
@@ -71,9 +90,10 @@ namespace Location
                 hud?.SetStatus("Location unavailable");
                 yield break;
             }
+
             _running = true;
-            hud?.SetStatus("Running"); 
-            
+            hud?.SetStatus("Running");
+
             // cache wait instruction; recreate only when interval changes
             float lastInterval = Mathf.Max(1f, pollSeconds);
             WaitForSeconds wait = new WaitForSeconds(lastInterval);
@@ -96,11 +116,18 @@ namespace Location
                         // compute delta (meters) origin -> current
                         Vector2 deltaMeters = GeoDeltaMeters(_origin, sample);
                         Vector3 offset = swapXZ
-                            ? new Vector3(deltaMeters.y, 0f, deltaMeters.x)   // swap X/Z if needed
+                            ? new Vector3(deltaMeters.y, 0f, deltaMeters.x) // swap X/Z if needed
                             : new Vector3(deltaMeters.x, 0f, deltaMeters.y);
 
                         if (player && startPoint)
-                            player.position = startPoint.position + offset;   // teleport
+                        {
+                            Vector3 target = startPoint.position + offset;
+                            if (_snapper != null && _snapper.TrySnap(target, sample.AccuracyMeters, out var snapped))
+                            {
+                                target = new Vector3(snapped.x, target.y, snapped.z);
+                            }
+                            player.position = target;
+                        }
                     }
                 }
 
@@ -119,11 +146,11 @@ namespace Location
         private static Vector2 GeoDeltaMeters(in LocationData a, in LocationData b)
         {
             double meanLatRad = ((a.Latitude + b.Latitude) * 0.5) * Mathf.Deg2Rad;
-            double dLat = (b.Latitude  - a.Latitude)  * Mathf.Deg2Rad;
+            double dLat = (b.Latitude - a.Latitude) * Mathf.Deg2Rad;
             double dLon = (b.Longitude - a.Longitude) * Mathf.Deg2Rad;
 
             const double earthRadius = 6378137.0; // meters (WGS84 a)
-            double east  = dLon * System.Math.Cos(meanLatRad) * earthRadius;
+            double east = dLon * System.Math.Cos(meanLatRad) * earthRadius;
             double north = dLat * earthRadius;
 
             return new Vector2((float)east, (float)north);

@@ -33,7 +33,7 @@ namespace Location
             // Advance a tiny bit every call to simulate movement
             var nextLat = _cur.Latitude + _stepLatDeg;
             var nextLon = _cur.Longitude + _stepLonDeg;
-            _cur = new LocationData(nextLat, nextLon, 2.0, Time.timeAsDouble);
+            _cur = new LocationData(nextLat, nextLon, 20, Time.timeAsDouble);
             data = _cur;
             return _ready;
         }
