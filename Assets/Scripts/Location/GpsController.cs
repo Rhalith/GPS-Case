@@ -12,24 +12,24 @@ namespace Location
 
         [SerializeField] private Transform startPoint; // same StartPoint used by GameManager
 
-        [Header("UI (optional)")] 
-        [SerializeField] private UI.GpsHud hud;
+        [Header("UI (optional)")] [SerializeField]
+        private UI.GpsHud hud;
 
-        [Header("Provider")] 
-        [SerializeField] private ProviderType provider = ProviderType.EditorFake;
+        [Header("Provider")] [SerializeField] private ProviderType provider = ProviderType.EditorFake;
 
-        [Header("Options")] 
-        [Tooltip("Seconds between polls.")] 
-        [SerializeField, Min(1f)] private float pollSeconds = 3f;
+        [Header("Options")] [Tooltip("Seconds between polls.")] [SerializeField, Min(1f)]
+        private float pollSeconds = 3f;
 
-        [Tooltip("Swap X/Z axes if your model's forward is different.")] 
-        [SerializeField] private bool swapXZ;
+        [Tooltip("Swap X/Z axes if your model's forward is different.")] [SerializeField]
+        private bool swapXZ;
 
         [Header("Snapping (optional)")]
-        [Tooltip("Assign any component that implements IPositionSnapper (e.g., NavMeshSnapper or MeshSnapper or PathSnapper).")]
-        [SerializeField] private MonoBehaviour snapperBehaviour;
+        [Tooltip(
+            "Assign any component that implements IPositionSnapper (e.g., NavMeshSnapper or MeshSnapper or PathSnapper).")]
+        [SerializeField]
+        private MonoBehaviour snapperBehaviour;
 
-        private IPositionSnapper _snapper;   // resolved at runtime
+        private IPositionSnapper _snapper; // resolved at runtime
 
         private IGpsProvider _gps;
         private bool _running;
@@ -57,15 +57,14 @@ namespace Location
 
         private void OnEnable()
         {
-#if UNITY_EDITOR
-            _gps = provider == ProviderType.UnityLocationService
-                ? new UnityLocationGpsProvider()
-                : new EditorFakeGpsProvider();
+#if UNITY_WEBGL && !UNITY_EDITOR
+            _gps = new WebGlGpsProvider();
 #else
             _gps = provider == ProviderType.UnityLocationService
                 ? new UnityLocationGpsProvider()
                 : new EditorFakeGpsProvider();
 #endif
+
             hud?.SetStatus("Initializing…");
             StartCoroutine(RunRoutine());
         }
@@ -126,6 +125,7 @@ namespace Location
                             {
                                 target = new Vector3(snapped.x, target.y, snapped.z);
                             }
+
                             player.position = target;
                         }
                     }
