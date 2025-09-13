@@ -1,33 +1,49 @@
 using UnityEngine;
-using Location;
 using TMPro;
+using Location;
 
 namespace UI
 {
-    /// <summary>Simple HUD: shows latest GPS values; optional wire from GpsController via public method.</summary>
     public sealed class GpsHud : MonoBehaviour
     {
-        [SerializeField] private TMP_Text latitudeText;
-        [SerializeField] private TMP_Text longitudeText;
-        [SerializeField] private TMP_Text accuracyText;
+        [Header("Texts")]
+        [SerializeField] private TMP_Text currentLatText;
+        [SerializeField] private TMP_Text currentLonText;
+        [SerializeField] private TMP_Text lastLatText;
+        [SerializeField] private TMP_Text lastLonText;
         [SerializeField] private TMP_Text statusText;
-        
-        [Header("Badge")]
-        [SerializeField] private AccuracyBadge accuracyBadge; 
+
+        [Header("Accuracy")]
+        [SerializeField] private TMP_Text accuracyText;
+        [SerializeField] private AccuracyBadge accuracyBadge;
+
+        [Header("Debug (optional)")]
+        [SerializeField] private TMP_Text decisionText;  // <-- add a TMP_Text in Canvas and assign here
 
         public void SetStatus(string status)
         {
             if (statusText) statusText.text = status;
-            if (status is "Initializing…" or "Location unavailable" or "Stopped")
+            if (status == "Initializing…" || status == "Location unavailable" || status == "Stopped")
                 accuracyBadge?.SetUnknown();
         }
 
-        public void SetSample(LocationData data)
+        public void SetCurrent(LocationData data)
         {
-            if (latitudeText)  latitudeText.text  = $"Lat: {data.Latitude:F6}";
-            if (longitudeText) longitudeText.text = $"Lon: {data.Longitude:F6}";
-            if (accuracyText)  accuracyText.text  = $"Acc: {data.AccuracyMeters:F1} m";
+            if (currentLatText) currentLatText.text = $"Current Lat: {data.Latitude:F6}";
+            if (currentLonText) currentLonText.text = $"Current Lon: {data.Longitude:F6}";
+        }
+
+        public void SetLastUpdated(LocationData data)
+        {
+            if (lastLatText) lastLatText.text = $"Last Lat: {data.Latitude:F6}";
+            if (lastLonText)  lastLonText.text = $"Last Lon: {data.Longitude:F6}";
+            if (accuracyText) accuracyText.text = $"Acc: {data.AccuracyMeters:F1} m";
             accuracyBadge?.SetAccuracy((float)data.AccuracyMeters);
+        }
+
+        public void SetDecision(string msg)
+        {
+            if (decisionText) decisionText.text = msg;
         }
     }
 }
